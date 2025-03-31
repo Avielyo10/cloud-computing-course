@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -33,16 +34,33 @@ type zerologLogger struct {
 
 // NewLogger creates a new logger instance
 func NewLogger() Logger {
-	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
+	consoleWriter := zerolog.ConsoleWriter{
+		Out:        os.Stdout,
+		TimeFormat: time.RFC3339,
+		FormatLevel: func(i interface{}) string {
+			if level, ok := i.(zerolog.Level); ok {
+				// It's already a zerolog.Level
+				return level.String() // or your custom formatting
+			} else if levelStr, ok := i.(string); ok {
+				// It's a string, convert it to the appropriate output
+				return levelStr // or format as needed
+			}
+			// Fallback for any other types
+			return fmt.Sprintf("%v", i)
+		},
+	}
 
 	// Set a more readable format for local development
 	if os.Getenv("AWS_EXECUTION_ENV") == "" {
-		output.FormatLevel = func(i interface{}) string {
-			return zerolog.LevelFieldMarshalFunc(i.(zerolog.Level))
+		consoleWriter.FormatLevel = func(i interface{}) string {
+			if level, ok := i.(zerolog.Level); ok {
+				return level.String()
+			}
+			return fmt.Sprintf("%v", i)
 		}
 	}
 
-	logger := zerolog.New(output).
+	logger := zerolog.New(consoleWriter).
 		With().
 		Timestamp().
 		Caller().
