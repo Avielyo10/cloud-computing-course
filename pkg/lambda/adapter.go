@@ -28,7 +28,7 @@ func NewAPIAdapter() *APIAdapter {
 	router.Use(gin.Recovery())
 
 	// Create service and handler
-	parkingService, err := service.NewParkingLotService()
+	parkingService, err := service.NewParkingLotService(context.Background())
 	if err != nil {
 		// Log the error and create a fallback in-memory service for development
 		log.Printf("Error creating DynamoDB service: %v, falling back to in-memory", err)

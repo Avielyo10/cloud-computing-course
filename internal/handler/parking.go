@@ -21,7 +21,7 @@ func NewParkingHandler(service service.ParkingLotServicer) *ParkingHandler {
 
 // PostEntry records a vehicle entry and generates a ticket
 func (h *ParkingHandler) PostEntry(c *gin.Context, params api.PostEntryParams) {
-	ticketID, _ := h.service.CreateTicket(params.Plate, params.ParkingLot)
+	ticketID, _ := h.service.CreateTicket(c, params.Plate, params.ParkingLot)
 
 	// Return the ticket ID
 	response := api.EntryResponse{
@@ -32,7 +32,7 @@ func (h *ParkingHandler) PostEntry(c *gin.Context, params api.PostEntryParams) {
 
 // PostExit processes a vehicle exit
 func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
-	ticket, exists := h.service.GetTicket(params.TicketId)
+	ticket, exists := h.service.GetTicket(c, params.TicketId)
 	if !exists {
 		errorMsg := "Ticket not found"
 		response := api.ErrorResponse{
@@ -54,7 +54,7 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 	}
 
 	// Remove the ticket from storage
-	h.service.RemoveTicket(params.TicketId)
+	h.service.RemoveTicket(c, params.TicketId)
 
 	c.JSON(http.StatusOK, response)
 }

@@ -19,13 +19,13 @@ import (
 // ParkingLotServicer defines the interface for parking lot operations
 type ParkingLotServicer interface {
 	// CreateTicket generates a new parking ticket
-	CreateTicket(plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket)
+	CreateTicket(ctx context.Context, plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket)
 
 	// GetTicket retrieves a ticket by ID
-	GetTicket(ticketID string) (*model.ParkingTicket, bool)
+	GetTicket(ctx context.Context, ticketID string) (*model.ParkingTicket, bool)
 
 	// RemoveTicket removes a ticket from storage
-	RemoveTicket(ticketID string)
+	RemoveTicket(ctx context.Context, ticketID string)
 
 	// CalculateCharge calculates parking fee
 	CalculateCharge(entryTime time.Time) (int, float32)
@@ -33,12 +33,13 @@ type ParkingLotServicer interface {
 
 // ParkingLotService handles parking lot operations with DynamoDB storage
 type ParkingLotService struct {
+	ctx       context.Context
 	client    *dynamodb.Client
 	tableName string
 }
 
 // NewParkingLotService creates a new service instance with DynamoDB
-func NewParkingLotService() (*ParkingLotService, error) {
+func NewParkingLotService(ctx context.Context) (*ParkingLotService, error) {
 	// Get table name from environment variable
 	tableName := os.Getenv("TABLE_NAME")
 	if tableName == "" {
@@ -46,7 +47,7 @@ func NewParkingLotService() (*ParkingLotService, error) {
 	}
 
 	// Load AWS configuration
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -55,13 +56,14 @@ func NewParkingLotService() (*ParkingLotService, error) {
 	client := dynamodb.NewFromConfig(cfg)
 
 	return &ParkingLotService{
+		ctx:       ctx,
 		client:    client,
 		tableName: tableName,
 	}, nil
 }
 
 // CreateTicket generates a new parking ticket and stores it in DynamoDB
-func (s *ParkingLotService) CreateTicket(plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket) {
+func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket) {
 	// Generate a unique ticket ID
 	ticketID := uuid.New()
 
@@ -82,7 +84,7 @@ func (s *ParkingLotService) CreateTicket(plate string, parkingLot int) (uuid.UUI
 	}
 
 	// Store the ticket in DynamoDB
-	_, err = s.client.PutItem(context.TODO(), &dynamodb.PutItemInput{
+	_, err = s.client.PutItem(s.ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	})
@@ -95,14 +97,14 @@ func (s *ParkingLotService) CreateTicket(plate string, parkingLot int) (uuid.UUI
 }
 
 // GetTicket retrieves a ticket by ID from DynamoDB
-func (s *ParkingLotService) GetTicket(ticketID string) (*model.ParkingTicket, bool) {
+func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*model.ParkingTicket, bool) {
 	// Create the key for DynamoDB query
 	key := map[string]types.AttributeValue{
 		"TicketID": &types.AttributeValueMemberS{Value: ticketID},
 	}
 
 	// Get the item from DynamoDB
-	result, err := s.client.GetItem(context.TODO(), &dynamodb.GetItemInput{
+	result, err := s.client.GetItem(s.ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
@@ -127,14 +129,14 @@ func (s *ParkingLotService) GetTicket(ticketID string) (*model.ParkingTicket, bo
 }
 
 // RemoveTicket removes a ticket from DynamoDB
-func (s *ParkingLotService) RemoveTicket(ticketID string) {
+func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 	// Create the key for DynamoDB deletion
 	key := map[string]types.AttributeValue{
 		"TicketID": &types.AttributeValueMemberS{Value: ticketID},
 	}
 
 	// Delete the item from DynamoDB
-	_, err := s.client.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+	_, err := s.client.DeleteItem(s.ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
