@@ -38,7 +38,7 @@ func (h *ParkingHandler) PostEntry(c *gin.Context, params api.PostEntryParams) {
 
 	// Return the ticket ID
 	response := api.EntryResponse{
-		TicketId: &ticketID,
+		TicketId: ticketID,
 	}
 
 	log.Info("Vehicle entry processed successfully",
@@ -60,7 +60,7 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 	if !exists {
 		errorMsg := "Ticket not found"
 		response := api.ErrorResponse{
-			Message: &errorMsg,
+			Message: errorMsg,
 		}
 		log.Warn("Ticket not found")
 		c.JSON(http.StatusNotFound, response)
@@ -77,10 +77,10 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 
 	// Create response
 	response := api.ExitResponse{
-		Plate:                 &ticket.Plate,
-		ParkingLot:            &ticket.ParkingLot,
-		ParkedDurationMinutes: &minutes,
-		Charge:                &charge,
+		Plate:                 ticket.Plate,
+		ParkingLot:            ticket.ParkingLot,
+		ParkedDurationMinutes: minutes,
+		Charge:                charge,
 	}
 
 	// Remove the ticket from storage

@@ -2,6 +2,11 @@ package lambda
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	ginadapter "github.com/awslabs/aws-lambda-go-api-proxy/gin"
@@ -24,8 +29,8 @@ const (
 
 // APIAdapter handles the integration with AWS Lambda
 type APIAdapter struct {
-	ginLambda *ginadapter.GinLambda
-	log       logger.Logger
+	router *gin.Engine
+	log    logger.Logger
 }
 
 // NewAPIAdapter creates a new API adapter for Lambda
@@ -73,6 +78,12 @@ func NewAPIAdapter() *APIAdapter {
 		).Info("Request completed")
 	})
 
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(404, api.ErrorResponse{
+			Message: "Not Found",
+		})
+	})
+
 	// Create service and handler
 	parkingService, err := service.NewParkingLotService(context.Background())
 	if err != nil {
@@ -88,8 +99,8 @@ func NewAPIAdapter() *APIAdapter {
 
 	// Create the Lambda adapter
 	return &APIAdapter{
-		ginLambda: ginadapter.New(router),
-		log:       log,
+		log:    log,
+		router: router,
 	}
 }
 
@@ -111,7 +122,8 @@ func (a *APIAdapter) ProxyWithContext(ctx context.Context, req events.APIGateway
 	reqLog.Info("Lambda request received")
 
 	// Handle the request
-	response, err := a.ginLambda.ProxyWithContext(ctx, req)
+	adapter := ginadapter.New(a.router)
+	response, err := adapter.ProxyWithContext(ctx, req)
 
 	// Log the result
 	statusCode := response.StatusCode
@@ -133,4 +145,42 @@ func (a *APIAdapter) Cleanup(ctx context.Context) error {
 	// Currently, there are no resources to clean up in this adapter
 	a.log.Info("Cleaning up Lambda API adapter")
 	return nil
+}
+
+// RunLocalServer starts the local server for testing with graceful shutdown
+func (a *APIAdapter) RunLocalServer(ctx context.Context) {
+	defer a.Cleanup(ctx)
+
+	// Create a custom HTTP server
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: a.router,
+	}
+
+	// Create a channel to listen for interrupt signals
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start the server in a goroutine
+	go func() {
+		a.log.Info("Starting local server on port 8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			a.log.Error("Failed to start local server", logger.Field{Key: "error", Value: err.Error()})
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-quit
+	a.log.Info("Shutdown signal received, gracefully stopping server...")
+
+	// Create a deadline for shutdown
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		a.log.Error("Server forced to shutdown", logger.Field{Key: "error", Value: err.Error()})
+	}
+
+	a.log.Info("Server gracefully stopped")
 }

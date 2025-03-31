@@ -14,20 +14,20 @@ import (
 
 // EntryResponse defines model for EntryResponse.
 type EntryResponse struct {
-	TicketId *openapi_types.UUID `json:"ticketId,omitempty"`
+	TicketId openapi_types.UUID `json:"ticketId"`
 }
 
 // ErrorResponse defines model for ErrorResponse.
 type ErrorResponse struct {
-	Message *string `json:"message,omitempty"`
+	Message string `json:"message"`
 }
 
 // ExitResponse defines model for ExitResponse.
 type ExitResponse struct {
-	Charge                *float32 `json:"charge,omitempty"`
-	ParkedDurationMinutes *int     `json:"parkedDurationMinutes,omitempty"`
-	ParkingLot            *int     `json:"parkingLot,omitempty"`
-	Plate                 *string  `json:"plate,omitempty"`
+	Charge                float32 `json:"charge"`
+	ParkedDurationMinutes int     `json:"parkedDurationMinutes"`
+	ParkingLot            int     `json:"parkingLot"`
+	Plate                 string  `json:"plate"`
 }
 
 // PostEntryParams defines parameters for PostEntry.

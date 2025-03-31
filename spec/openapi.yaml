@@ -78,6 +78,8 @@ components:
   schemas:
     EntryResponse:
       type: object
+      required:
+        - ticketId
       properties:
         ticketId:
           type: string
@@ -86,6 +88,11 @@ components:
 
     ExitResponse:
       type: object
+      required:
+        - plate
+        - parkingLot
+        - parkedDurationMinutes
+        - charge
       properties:
         plate:
           type: string
@@ -103,6 +110,8 @@ components:
 
     ErrorResponse:
       type: object
+      required:
+        - message
       properties:
         message:
           type: string
