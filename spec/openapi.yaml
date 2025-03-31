@@ -1,0 +1,109 @@
+openapi: 3.0.3
+info:
+  title: Parking Lot Management API
+  version: 1.0.0
+  description: |-
+    API specification for the cloud-based parking lot management system.
+
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com/prod
+    variables:
+      apiId:
+        default: yourApiId
+      region:
+        default: us-east-1
+
+paths:
+  /entry:
+    post:
+      summary: Record vehicle entry and generate ticket
+      parameters:
+        - name: plate
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "123-123-123"
+        - name: parkingLot
+          in: query
+          required: true
+          schema:
+            type: integer
+            example: 382
+      responses:
+        '200':
+          description: Successful entry recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /exit:
+    post:
+      summary: Calculate fee and complete vehicle exit
+      parameters:
+        - name: ticketId
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "abc123xyz"
+      responses:
+        '200':
+          description: Successful exit processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExitResponse'
+        '404':
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    EntryResponse:
+      type: object
+      properties:
+        ticketId:
+          type: string
+          format: uuid
+          example: "123e4567-e89b-12d3-a456-426614174000"
+
+    ExitResponse:
+      type: object
+      properties:
+        plate:
+          type: string
+          example: "123-123-123"
+        parkingLot:
+          type: integer
+          example: 382
+        parkedDurationMinutes:
+          type: integer
+          example: 45
+        charge:
+          type: number
+          format: float
+          example: 7.5
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Invalid ticket ID or parameters."
