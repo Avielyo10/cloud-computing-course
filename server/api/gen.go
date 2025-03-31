@@ -38,7 +38,7 @@ type PostEntryParams struct {
 
 // PostExitParams defines parameters for PostExit.
 type PostExitParams struct {
-	TicketId string `form:"ticketId" json:"ticketId"`
+	TicketId openapi_types.UUID `form:"ticketId" json:"ticketId"`
 }
 
 // ServerInterface represents all server handlers.

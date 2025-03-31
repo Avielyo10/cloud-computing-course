@@ -9,9 +9,10 @@ servers:
   - url: https://{apiId}.execute-api.{region}.amazonaws.com/prod
     variables:
       apiId:
-        default: yourApiId
+        default: parking-lot-api
+        description: The API Gateway ID for the deployed API.
       region:
-        default: us-east-1
+        default: il-central-1
 
 paths:
   /entry:
@@ -53,7 +54,8 @@ paths:
           required: true
           schema:
             type: string
-            example: "abc123xyz"
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
       responses:
         '200':
           description: Successful exit processed
