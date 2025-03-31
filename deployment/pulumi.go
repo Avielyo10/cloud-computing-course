@@ -92,7 +92,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create API Gateway resources for entry and exit paths
 		entryResource, err := apigateway.NewResource(ctx, "entryResource", &apigateway.ResourceArgs{
 			RestApi:  api.ID(),
@@ -102,7 +102,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		exitResource, err := apigateway.NewResource(ctx, "exitResource", &apigateway.ResourceArgs{
 			RestApi:  api.ID(),
 			ParentId: api.RootResourceId,
@@ -111,14 +111,14 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create POST methods for each resource
 		entryMethod, err := apigateway.NewMethod(ctx, "entryMethod", &apigateway.MethodArgs{
-			RestApi:          api.ID(),
-			ResourceId:       entryResource.ID(),
-			HttpMethod:       pulumi.String("POST"),
-			Authorization:    pulumi.String("NONE"),
-			ApiKeyRequired:   pulumi.Bool(false),
+			RestApi:        api.ID(),
+			ResourceId:     entryResource.ID(),
+			HttpMethod:     pulumi.String("POST"),
+			Authorization:  pulumi.String("NONE"),
+			ApiKeyRequired: pulumi.Bool(false),
 			RequestParameters: pulumi.BoolMap{
 				"method.request.querystring.plate":      pulumi.Bool(true),
 				"method.request.querystring.parkingLot": pulumi.Bool(true),
@@ -127,13 +127,13 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		exitMethod, err := apigateway.NewMethod(ctx, "exitMethod", &apigateway.MethodArgs{
-			RestApi:          api.ID(),
-			ResourceId:       exitResource.ID(),
-			HttpMethod:       pulumi.String("POST"),
-			Authorization:    pulumi.String("NONE"),
-			ApiKeyRequired:   pulumi.Bool(false),
+			RestApi:        api.ID(),
+			ResourceId:     exitResource.ID(),
+			HttpMethod:     pulumi.String("POST"),
+			Authorization:  pulumi.String("NONE"),
+			ApiKeyRequired: pulumi.Bool(false),
 			RequestParameters: pulumi.BoolMap{
 				"method.request.querystring.ticketId": pulumi.Bool(true),
 			},
@@ -141,32 +141,32 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Add Lambda integrations
 		entryIntegration, err := apigateway.NewIntegration(ctx, "entryIntegration", &apigateway.IntegrationArgs{
-			RestApi:             api.ID(),
-			ResourceId:          entryResource.ID(),
-			HttpMethod:          entryMethod.HttpMethod,
+			RestApi:               api.ID(),
+			ResourceId:            entryResource.ID(),
+			HttpMethod:            entryMethod.HttpMethod,
 			IntegrationHttpMethod: pulumi.String("POST"),
-			Type:                pulumi.String("AWS_PROXY"),
-			Uri:                 entryLambda.InvokeArn,
+			Type:                  pulumi.String("AWS_PROXY"),
+			Uri:                   entryLambda.InvokeArn,
 		})
 		if err != nil {
 			return err
 		}
-		
+
 		exitIntegration, err := apigateway.NewIntegration(ctx, "exitIntegration", &apigateway.IntegrationArgs{
-			RestApi:             api.ID(),
-			ResourceId:          exitResource.ID(),
-			HttpMethod:          exitMethod.HttpMethod,
+			RestApi:               api.ID(),
+			ResourceId:            exitResource.ID(),
+			HttpMethod:            exitMethod.HttpMethod,
 			IntegrationHttpMethod: pulumi.String("POST"),
-			Type:                pulumi.String("AWS_PROXY"),
-			Uri:                 exitLambda.InvokeArn,
+			Type:                  pulumi.String("AWS_PROXY"),
+			Uri:                   exitLambda.InvokeArn,
 		})
 		if err != nil {
 			return err
 		}
-		
+
 		// Grant API Gateway permission to invoke the Lambda functions
 		_, err = lambda.NewPermission(ctx, "apiGatewayEntryPermission", &lambda.PermissionArgs{
 			Action:    pulumi.String("lambda:InvokeFunction"),
@@ -177,7 +177,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		_, err = lambda.NewPermission(ctx, "apiGatewayExitPermission", &lambda.PermissionArgs{
 			Action:    pulumi.String("lambda:InvokeFunction"),
 			Function:  exitLambda.Name,
@@ -187,7 +187,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create a deployment to make the API available
 		deployment, err := apigateway.NewDeployment(ctx, "apiDeployment", &apigateway.DeploymentArgs{
 			RestApi: api.ID(),
@@ -202,7 +202,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		
+
 		// Create a stage for the deployment
 		_, err = apigateway.NewStage(ctx, "prodStage", &apigateway.StageArgs{
 			RestApi:    api.ID(),
