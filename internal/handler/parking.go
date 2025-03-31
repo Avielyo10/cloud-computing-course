@@ -56,7 +56,7 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 	)
 	log.Info("Processing vehicle exit")
 
-	ticket, exists := h.service.GetTicket(ctx, params.TicketId)
+	ticket, exists := h.service.GetTicket(ctx, params.TicketId.String())
 	if !exists {
 		errorMsg := "Ticket not found"
 		response := api.ErrorResponse{
@@ -84,7 +84,7 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 	}
 
 	// Remove the ticket from storage
-	h.service.RemoveTicket(ctx, params.TicketId)
+	h.service.RemoveTicket(ctx, params.TicketId.String())
 
 	log.Info("Vehicle exit processed successfully")
 	c.JSON(http.StatusOK, response)
