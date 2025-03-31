@@ -13,19 +13,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 
+	"parking-lot/internal/logger"
 	"parking-lot/internal/model"
 )
 
 // ParkingLotServicer defines the interface for parking lot operations
 type ParkingLotServicer interface {
 	// CreateTicket generates a new parking ticket
-	CreateTicket(plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket)
+	CreateTicket(ctx context.Context, plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket)
 
 	// GetTicket retrieves a ticket by ID
-	GetTicket(ticketID string) (*model.ParkingTicket, bool)
+	GetTicket(ctx context.Context, ticketID string) (*model.ParkingTicket, bool)
 
 	// RemoveTicket removes a ticket from storage
-	RemoveTicket(ticketID string)
+	RemoveTicket(ctx context.Context, ticketID string)
 
 	// CalculateCharge calculates parking fee
 	CalculateCharge(entryTime time.Time) (int, float32)
@@ -33,12 +34,17 @@ type ParkingLotServicer interface {
 
 // ParkingLotService handles parking lot operations with DynamoDB storage
 type ParkingLotService struct {
+	ctx       context.Context
 	client    *dynamodb.Client
 	tableName string
+	log       logger.Logger
 }
 
 // NewParkingLotService creates a new service instance with DynamoDB
-func NewParkingLotService() (*ParkingLotService, error) {
+func NewParkingLotService(ctx context.Context) (*ParkingLotService, error) {
+	// Initialize logger
+	log := logger.NewLogger().WithContext(ctx)
+
 	// Get table name from environment variable
 	tableName := os.Getenv("TABLE_NAME")
 	if tableName == "" {
@@ -46,7 +52,7 @@ func NewParkingLotService() (*ParkingLotService, error) {
 	}
 
 	// Load AWS configuration
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
@@ -55,13 +61,21 @@ func NewParkingLotService() (*ParkingLotService, error) {
 	client := dynamodb.NewFromConfig(cfg)
 
 	return &ParkingLotService{
+		ctx:       ctx,
 		client:    client,
 		tableName: tableName,
+		log:       log,
 	}, nil
 }
 
 // CreateTicket generates a new parking ticket and stores it in DynamoDB
-func (s *ParkingLotService) CreateTicket(plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket) {
+func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, parkingLot int) (uuid.UUID, *model.ParkingTicket) {
+	log := s.log.WithContext(ctx).WithFields(
+		logger.Field{Key: "plate", Value: plate},
+		logger.Field{Key: "parking_lot", Value: parkingLot},
+	)
+	log.Info("Creating parking ticket")
+
 	// Generate a unique ticket ID
 	ticketID := uuid.New()
 
@@ -77,69 +91,85 @@ func (s *ParkingLotService) CreateTicket(plate string, parkingLot int) (uuid.UUI
 	item, err := attributevalue.MarshalMap(ticket)
 	if err != nil {
 		// Log error and return the ticket anyway (best effort)
-		fmt.Printf("Error marshaling ticket: %v\n", err)
+		log.Error("Failed to marshal ticket", logger.Field{Key: "error", Value: err.Error()})
 		return ticketID, ticket
 	}
 
 	// Store the ticket in DynamoDB
-	_, err = s.client.PutItem(context.TODO(), &dynamodb.PutItemInput{
+	_, err = s.client.PutItem(s.ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	})
 	if err != nil {
 		// Log error and return the ticket anyway (best effort)
-		fmt.Printf("Error storing ticket in DynamoDB: %v\n", err)
+		log.Error("Failed to store ticket in DynamoDB", logger.Field{Key: "error", Value: err.Error()})
+	} else {
+		log.Info("Successfully stored ticket in DynamoDB", logger.Field{Key: "ticket_id", Value: ticketID.String()})
 	}
 
 	return ticketID, ticket
 }
 
 // GetTicket retrieves a ticket by ID from DynamoDB
-func (s *ParkingLotService) GetTicket(ticketID string) (*model.ParkingTicket, bool) {
+func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*model.ParkingTicket, bool) {
+	log := s.log.WithContext(ctx).WithFields(logger.Field{Key: "ticket_id", Value: ticketID})
+	log.Info("Retrieving ticket")
+
 	// Create the key for DynamoDB query
 	key := map[string]types.AttributeValue{
 		"TicketID": &types.AttributeValueMemberS{Value: ticketID},
 	}
 
 	// Get the item from DynamoDB
-	result, err := s.client.GetItem(context.TODO(), &dynamodb.GetItemInput{
+	result, err := s.client.GetItem(s.ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
 	if err != nil {
-		fmt.Printf("Error retrieving ticket from DynamoDB: %v\n", err)
+		log.Error("Failed to retrieve ticket from DynamoDB", logger.Field{Key: "error", Value: err.Error()})
 		return nil, false
 	}
 
 	// Check if item exists
 	if result.Item == nil {
+		log.Warn("Ticket not found")
 		return nil, false
 	}
 
 	// Unmarshal the item into a ticket
 	ticket := &model.ParkingTicket{}
 	if err := attributevalue.UnmarshalMap(result.Item, ticket); err != nil {
-		fmt.Printf("Error unmarshaling ticket: %v\n", err)
+		log.Error("Failed to unmarshal ticket", logger.Field{Key: "error", Value: err.Error()})
 		return nil, false
 	}
 
+	log.Info("Successfully retrieved ticket",
+		logger.Field{Key: "plate", Value: ticket.Plate},
+		logger.Field{Key: "parking_lot", Value: ticket.ParkingLot},
+	)
 	return ticket, true
 }
 
 // RemoveTicket removes a ticket from DynamoDB
-func (s *ParkingLotService) RemoveTicket(ticketID string) {
+func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
+	log := s.log.WithContext(ctx).WithFields(logger.Field{Key: "ticket_id", Value: ticketID})
+	log.Info("Removing ticket")
+
 	// Create the key for DynamoDB deletion
 	key := map[string]types.AttributeValue{
 		"TicketID": &types.AttributeValueMemberS{Value: ticketID},
 	}
 
 	// Delete the item from DynamoDB
-	_, err := s.client.DeleteItem(context.TODO(), &dynamodb.DeleteItemInput{
+	_, err := s.client.DeleteItem(s.ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
 	if err != nil {
-		fmt.Printf("Error deleting ticket from DynamoDB: %v\n", err)
+		log.Error("Failed to delete ticket from DynamoDB", logger.Field{Key: "error", Value: err.Error()})
+
+	} else {
+		log.Info("Successfully removed ticket")
 	}
 }
 

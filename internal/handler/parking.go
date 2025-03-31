@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"parking-lot/internal/logger"
 	"parking-lot/internal/service"
 	"parking-lot/server/api"
 )
@@ -12,38 +13,67 @@ import (
 // ParkingHandler implements the ServerInterface
 type ParkingHandler struct {
 	service service.ParkingLotServicer
+	log     logger.Logger
 }
 
 // NewParkingHandler creates a new handler with the given service
 func NewParkingHandler(service service.ParkingLotServicer) *ParkingHandler {
-	return &ParkingHandler{service: service}
+	return &ParkingHandler{
+		service: service,
+		log:     logger.NewLogger(),
+	}
 }
 
 // PostEntry records a vehicle entry and generates a ticket
 func (h *ParkingHandler) PostEntry(c *gin.Context, params api.PostEntryParams) {
-	ticketID, _ := h.service.CreateTicket(params.Plate, params.ParkingLot)
+	ctx := c.Request.Context()
+
+	log := h.log.WithContext(ctx).WithFields(
+		logger.Field{Key: "plate", Value: params.Plate},
+		logger.Field{Key: "parking_lot", Value: params.ParkingLot},
+	)
+	log.Info("Processing vehicle entry")
+
+	ticketID, _ := h.service.CreateTicket(ctx, params.Plate, params.ParkingLot)
 
 	// Return the ticket ID
 	response := api.EntryResponse{
 		TicketId: &ticketID,
 	}
+
+	log.Info("Vehicle entry processed successfully",
+		logger.Field{Key: "ticket_id", Value: ticketID.String()},
+	)
 	c.JSON(http.StatusOK, response)
 }
 
 // PostExit processes a vehicle exit
 func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
-	ticket, exists := h.service.GetTicket(params.TicketId)
+	ctx := c.Request.Context()
+
+	log := h.log.WithContext(ctx).WithFields(
+		logger.Field{Key: "ticket_id", Value: params.TicketId},
+	)
+	log.Info("Processing vehicle exit")
+
+	ticket, exists := h.service.GetTicket(ctx, params.TicketId)
 	if !exists {
 		errorMsg := "Ticket not found"
 		response := api.ErrorResponse{
 			Message: &errorMsg,
 		}
+		log.Warn("Ticket not found")
 		c.JSON(http.StatusNotFound, response)
 		return
 	}
 
 	// Calculate parking duration and charge
 	minutes, charge := h.service.CalculateCharge(ticket.EntryTime)
+
+	log.Info("Calculated parking charge",
+		logger.Field{Key: "minutes", Value: minutes},
+		logger.Field{Key: "charge", Value: charge},
+	)
 
 	// Create response
 	response := api.ExitResponse{
@@ -54,7 +84,8 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 	}
 
 	// Remove the ticket from storage
-	h.service.RemoveTicket(params.TicketId)
+	h.service.RemoveTicket(ctx, params.TicketId)
 
+	log.Info("Vehicle exit processed successfully")
 	c.JSON(http.StatusOK, response)
 }

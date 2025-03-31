@@ -14,6 +14,7 @@ require (
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/pulumi/pulumi-aws/sdk/v6 v6.74.0
 	github.com/pulumi/pulumi/sdk/v3 v3.159.0
+	github.com/rs/zerolog v1.34.0
 )
 
 require (
@@ -75,6 +76,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
