@@ -15,6 +15,9 @@ func main() {
 		table, err := dynamodb.NewTable(ctx, "parkingTickets", &dynamodb.TableArgs{
 			Attributes: dynamodb.TableAttributeArray{
 				&dynamodb.TableAttributeArgs{Name: pulumi.String("ticketId"), Type: pulumi.String("S")},
+				&dynamodb.TableAttributeArgs{Name: pulumi.String("plate"), Type: pulumi.String("S")},
+				&dynamodb.TableAttributeArgs{Name: pulumi.String("parkingLot"), Type: pulumi.String("N")},
+				&dynamodb.TableAttributeArgs{Name: pulumi.String("entryTime"), Type: pulumi.String("S")},
 			},
 			HashKey:     pulumi.String("ticketId"),
 			BillingMode: pulumi.String("PAY_PER_REQUEST"),
@@ -58,9 +61,9 @@ func main() {
 		// Lambda function for Entry
 		entryLambda, err := lambda.NewFunction(ctx, "entryHandler", &lambda.FunctionArgs{
 			Role:    lambdaRole.Arn,
-			Runtime: pulumi.String("go1.x"),
+			Runtime: pulumi.String("provided.al2"),
 			Handler: pulumi.String("bootstrap"),
-			Code:    pulumi.NewFileArchive("./cmd/lambda/entry-handler.zip"),
+			Code:    pulumi.NewFileArchive("../cmd/lambda/entry-handler.zip"),
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
 					"TABLE_NAME": table.Name,
@@ -74,9 +77,9 @@ func main() {
 		// Lambda function for Exit
 		exitLambda, err := lambda.NewFunction(ctx, "exitHandler", &lambda.FunctionArgs{
 			Role:    lambdaRole.Arn,
-			Runtime: pulumi.String("go1.x"),
+			Runtime: pulumi.String("provided.al2"),
 			Handler: pulumi.String("bootstrap"),
-			Code:    pulumi.NewFileArchive("./cmd/lambda/exit-handler.zip"),
+			Code:    pulumi.NewFileArchive("../cmd/lambda/exit-handler.zip"),
 			Environment: &lambda.FunctionEnvironmentArgs{
 				Variables: pulumi.StringMap{
 					"TABLE_NAME": table.Name,
@@ -88,7 +91,10 @@ func main() {
 		}
 
 		// API Gateway setup
-		api, err := apigateway.NewRestApi(ctx, "parkingApi", &apigateway.RestApiArgs{})
+		api, err := apigateway.NewRestApi(ctx, "parkingApi", &apigateway.RestApiArgs{
+			Name: pulumi.String("Parking Lot API"),
+			Description: pulumi.String("API for parking lot management system"),
+		})
 		if err != nil {
 			return err
 		}
@@ -190,11 +196,8 @@ func main() {
 
 		// Create a deployment to make the API available
 		deployment, err := apigateway.NewDeployment(ctx, "apiDeployment", &apigateway.DeploymentArgs{
-			RestApi: api.ID(),
-			// Use a changing value to force redeployment when needed
+			RestApi:     api.ID(),
 			Description: pulumi.String("Initial deployment"),
-			// Explicit dependencies to ensure resources are created first
-			StageName: pulumi.String("prod"),
 		}, pulumi.DependsOn([]pulumi.Resource{
 			entryIntegration,
 			exitIntegration,
@@ -218,7 +221,7 @@ func main() {
 		ctx.Export("apiEndpoint", api.ExecutionArn)
 		ctx.Export("entryLambdaName", entryLambda.Name)
 		ctx.Export("exitLambdaName", exitLambda.Name)
-		ctx.Export("exitLambdaName", exitLambda.Name)
+		ctx.Export("dynamoTableName", table.Name)
 
 		return nil
 	})
