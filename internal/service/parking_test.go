@@ -239,56 +239,137 @@ func TestRemoveTicket_DeleteItemError(t *testing.T) {
 func TestCalculateCharge(t *testing.T) {
 	// Setup
 	service := &ParkingLotService{
-		marshalMap:   attributevalue.MarshalMap,
-		unmarshalMap: attributevalue.UnmarshalMap,
+		// No need for marshalMap/unmarshalMap for this specific test
+		// as CalculateCharge doesn't interact with DynamoDB.
+		// log: logger.NewLogger(), // Initialize logger if CalculateCharge uses it (it doesn't currently)
 	}
 
 	testCases := []struct {
 		name            string
-		entryTime       time.Time
+		duration        time.Duration // Use duration for more precise control
 		expectedMinutes int
 		expectedCharge  float32
 	}{
 		{
-			name:            "Less than minimum charge",
-			entryTime:       time.Now().Add(-20 * time.Minute),
-			expectedMinutes: 20,
-			expectedCharge:  5.0, // Minimum charge is $5
+			name:            "0 minutes (edge case, should be 0 charge)",
+			duration:        0 * time.Minute,
+			expectedMinutes: 0,
+			expectedCharge:  0.0, // Correct: 0 increments
 		},
 		{
-			name:            "More than minimum charge",
-			entryTime:       time.Now().Add(-60 * time.Minute),
+			name:            "1 minute (1st 15-min increment)",
+			duration:        1 * time.Minute,
+			expectedMinutes: 1,
+			expectedCharge:  2.50, // Correct: 1 increment * $2.50
+		},
+		{
+			name:            "14.999 minutes (1st 15-min increment)",
+			duration:        14*time.Minute + 59*time.Second + 999*time.Millisecond,
+			expectedMinutes: 14, // approx
+			expectedCharge:  2.50, // Correct: 1 increment * $2.50
+		},
+		{
+			name:            "15 minutes (1st 15-min increment)",
+			duration:        15 * time.Minute,
+			expectedMinutes: 15,
+			expectedCharge:  2.50, // Correct: 1 increment * $2.50
+		},
+		{
+			name:            "15.001 minutes (2nd 15-min increment)", // Barely into the 2nd increment
+			duration:        15*time.Minute + 1*time.Millisecond,
+			expectedMinutes: 15, // approx
+			expectedCharge:  5.00, // Correct: 2 increments * $2.50
+		},
+		{
+			name:            "16 minutes (2nd 15-min increment)",
+			duration:        16 * time.Minute,
+			expectedMinutes: 16,
+			expectedCharge:  5.00, // Correct: 2 increments * $2.50
+		},
+		{
+			name:            "29.999 minutes (2nd 15-min increment)",
+			duration:        29*time.Minute + 59*time.Second + 999*time.Millisecond,
+			expectedMinutes: 29, // approx
+			expectedCharge:  5.00, // Correct: 2 increments * $2.50
+		},
+		{
+			name:            "30 minutes (2nd 15-min increment)",
+			duration:        30 * time.Minute,
+			expectedMinutes: 30,
+			expectedCharge:  5.00, // Correct: 2 increments * $2.50
+		},
+		{
+			name:            "30.001 minutes (3rd 15-min increment)",
+			duration:        30*time.Minute + 1*time.Millisecond,
+			expectedMinutes: 30, // approx
+			expectedCharge:  7.50, // Correct: 3 increments * $2.50
+		},
+		{
+			name:            "50 minutes (4th 15-min increment)", // ceil(50/15) = 4
+			duration:        50 * time.Minute,
+			expectedMinutes: 50,
+			expectedCharge:  10.00, // Correct: 4 increments * $2.50
+		},
+		{
+			name:            "59.999 minutes (4th 15-min increment)",
+			duration:        59*time.Minute + 59*time.Second + 999*time.Millisecond,
+			expectedMinutes: 59, // approx
+			expectedCharge:  10.00, // Correct: 4 increments * $2.50
+		},
+		{
+			name:            "60 minutes / 1 hour (4th 15-min increment)", // ceil(60/15) = 4
+			duration:        60 * time.Minute,
 			expectedMinutes: 60,
-			expectedCharge:  6.0, // 60 minutes * $0.10 = $6.00
+			expectedCharge:  10.00, // Correct: 4 increments * $2.50
 		},
 		{
-			name:            "2 hours parking",
-			entryTime:       time.Now().Add(-120 * time.Minute),
+			name:            "60.001 minutes (5th 15-min increment)",
+			duration:        60*time.Minute + 1*time.Millisecond,
+			expectedMinutes: 60, // approx
+			expectedCharge:  12.50, // Correct: 5 increments * $2.50
+		},
+		{
+			name:            "70 minutes (5th 15-min increment)", // ceil(70/15) = 5
+			duration:        70 * time.Minute,
+			expectedMinutes: 70,
+			expectedCharge:  12.50, // Correct: 5 increments * $2.50
+		},
+		{
+			name:            "119.999 minutes (8th 15-min increment)",
+			duration:        119*time.Minute + 59*time.Second + 999*time.Millisecond,
+			expectedMinutes: 119, // approx
+			expectedCharge:  20.00, // Correct: 8 increments * $2.50
+		},
+		{
+			name:            "120 minutes / 2 hours (8th 15-min increment)", // ceil(120/15) = 8
+			duration:        120 * time.Minute,
 			expectedMinutes: 120,
-			expectedCharge:  12.0, // 120 minutes * $0.10 = $12.00
+			expectedCharge:  20.00, // Correct: 8 increments * $2.50
+		},
+		{
+			name:            "120.001 minutes (9th 15-min increment)",
+			duration:        120*time.Minute + 1*time.Millisecond,
+			expectedMinutes: 120, // approx
+			expectedCharge:  22.50, // Correct: 9 increments * $2.50
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Because time.Since is used, we need to account for the time that passes during the test
-			// Allow for a small margin of error in the minute calculation
-			minutes, charge := service.CalculateCharge(tc.entryTime)
+			// Simulate the entry time by subtracting the duration from the current time
+			entryTime := time.Now().Add(-tc.duration)
 
-			// The minutes might be slightly different due to test execution time
-			assert.True(t, minutes >= 0 && minutes <= tc.expectedMinutes+2, "Minutes should be close to expected")
+			minutes, charge := service.CalculateCharge(entryTime)
 
-			// For charge, we should check if it's calculated correctly based on the actual minutes
-			// Use the max function from service.go
-			if minutes < 50 {
-				assert.Equal(t, float32(5.0), charge, "Charge should be minimum $5.00")
-			} else {
-				expectedCharge := float32(0.10 * float64(minutes))
-				if expectedCharge < 5.0 {
-					expectedCharge = 5.0
-				}
-				assert.Equal(t, expectedCharge, charge)
-			}
+			// Allow for a small discrepancy in minutes due to test execution time.
+			// The actual minutes calculated by time.Since(entryTime) might be slightly
+			// greater than tc.expectedMinutes if the test takes a moment to run.
+			// We check if 'minutes' is very close to 'tc.expectedMinutes'.
+			// A common way is to check if it's within a small delta, e.g., expectedMinutes or expectedMinutes + 1.
+			// For durations like 0, it should be 0 or 1.
+			assert.InDelta(t, tc.expectedMinutes, minutes, 1.5, "Minutes should be very close to expected")
+
+			assert.Equal(t, tc.expectedCharge, charge, "Charge should match expected value")
 		})
 	}
 }

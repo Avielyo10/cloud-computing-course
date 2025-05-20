@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -109,7 +110,7 @@ func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, park
 	}
 
 	// Store the ticket in DynamoDB
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{ // Changed s.ctx to ctx
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	})
@@ -134,7 +135,7 @@ func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*mo
 	}
 
 	// Get the item from DynamoDB
-	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{ // Changed s.ctx to ctx
+	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
@@ -174,7 +175,7 @@ func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 	}
 
 	// Delete the item from DynamoDB
-	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{ // Changed s.ctx to ctx
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
@@ -189,18 +190,40 @@ func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 // CalculateCharge calculates parking fee
 func (s *ParkingLotService) CalculateCharge(entryTime time.Time) (int, float32) {
 	duration := time.Since(entryTime)
-	minutes := int(duration.Minutes())
+	totalMinutes := duration.Minutes() // Get duration as float64 for precision
 
-	// Calculate charge ($0.10 per minute with a minimum of $5)
-	charge := float32(max(5.0, float64(minutes)*0.10))
-
-	return minutes, charge
-}
-
-// max returns the larger of x or y
-func max(x, y float64) float64 {
-	if x > y {
-		return x
+	// Threshold for zero charge: 1 microsecond in minutes.
+	// (1 microsecond = 1e-6 seconds). (1e-6 seconds) / 60 seconds/minute.
+	const zeroChargeThresholdMinutes = (1.0e-6) / 60.0
+	if totalMinutes < zeroChargeThresholdMinutes {
+		return 0, 0.0
 	}
-	return y
+
+	// Epsilon to handle floating point inaccuracies at 15-minute boundaries.
+	// If entryTime was exactly 15 mins ago, time.Since(entryTime) might yield 15.000...01 minutes.
+	// Subtracting this epsilon helps ensure it's treated as 15 minutes (1st increment)
+	// and not pushed into the 2nd increment.
+	// 1 millisecond = 0.001 seconds. (0.001 seconds) / 60 seconds/minute.
+	const boundaryEpsilonMinutes = 0.001 / 60.0
+
+	adjustedMinutes := totalMinutes - boundaryEpsilonMinutes
+	// Ensure adjustedMinutes doesn't become negative if totalMinutes is very small but above zeroChargeThreshold.
+	if adjustedMinutes < 0 {
+		adjustedMinutes = 0
+	}
+
+	numberOf15MinIncrements := math.Ceil(adjustedMinutes / 15.0)
+
+	// If totalMinutes was positive (>= zeroChargeThresholdMinutes) but numberOf15MinIncrements became 0
+	// (due to adjustedMinutes becoming <= 0), it should still count as 1 increment.
+	// This handles cases where zeroChargeThresholdMinutes < totalMinutes <= boundaryEpsilonMinutes.
+	if numberOf15MinIncrements == 0 && totalMinutes >= zeroChargeThresholdMinutes {
+		numberOf15MinIncrements = 1
+	}
+
+	charge := float32(numberOf15MinIncrements * 2.5)
+	return int(math.Round(totalMinutes)), charge
 }
+
+// ParkingSpaceManager defines methods for managing parking space availability (placeholder)
+// ...existing code...
