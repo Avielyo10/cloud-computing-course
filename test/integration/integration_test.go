@@ -17,7 +17,7 @@ import (
 	
 	"parking-lot/internal/handler"
 	"parking-lot/internal/service"
-	lambdaAdapter "parking-lot/pkg/lambda/adapter"
+	"parking-lot/pkg/lambda"
 )
 
 // TestEndToEndFlow tests the entire flow from entry to exit
@@ -39,7 +39,10 @@ func TestEndToEndFlow(t *testing.T) {
 	
 	// Create the handler
 	parkingHandler := handler.NewParkingHandler(parkingService)
-	
+
+	// Create the Lambda adapter
+	adapter := lambda.NewAdapter(parkingHandler)
+
 	// Test data
 	plate := fmt.Sprintf("TEST-%s", uuid.New().String()[:8])
 	parkingLot := 999
@@ -94,7 +97,7 @@ func TestAPIAdapter(t *testing.T) {
 	}
 	
 	// Create the adapter
-	adapter := lambdaAdapter.NewAPIAdapter()
+	adapter := lambda.NewAdapter()
 	
 	// Start the server in a goroutine
 	serverReady := make(chan bool)
