@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -34,10 +35,21 @@ type ParkingLotServicer interface {
 
 // ParkingLotService handles parking lot operations with DynamoDB storage
 type ParkingLotService struct {
-	ctx       context.Context
-	client    *dynamodb.Client
-	tableName string
-	log       logger.Logger
+	ctx          context.Context
+	client       DynamoDBClient
+	tableName    string
+	log          logger.Logger
+	marshalMap   func(interface{}) (map[string]types.AttributeValue, error)
+	unmarshalMap func(map[string]types.AttributeValue, interface{}) error
+}
+
+// DynamoDBClient defines the interface for DynamoDB operations
+// This makes it easier to mock for testing
+type DynamoDBClient interface {
+	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+	// Add other DynamoDB methods as needed
 }
 
 // NewParkingLotService creates a new service instance with DynamoDB
@@ -57,14 +69,28 @@ func NewParkingLotService(ctx context.Context) (*ParkingLotService, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	// If AWS_ENDPOINT_URL is set (for DynamoDB Local), use it and anonymous credentials
+	if endpointURL := os.Getenv("AWS_ENDPOINT_URL"); endpointURL != "" {
+		log.Info("Using DynamoDB Local with endpoint", logger.Field{Key: "endpoint_url", Value: endpointURL})
+		cfg.Region = os.Getenv("AWS_REGION") // Still need region for the SDK
+		cfg.Credentials = aws.AnonymousCredentials{}
+		cfg.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{URL: endpointURL}, nil
+			},
+		)
+	}
+
 	// Create DynamoDB client
 	client := dynamodb.NewFromConfig(cfg)
 
 	return &ParkingLotService{
-		ctx:       ctx,
-		client:    client,
-		tableName: tableName,
-		log:       log,
+		ctx:          ctx,
+		client:       client,
+		tableName:    tableName,
+		log:          log,
+		marshalMap:   attributevalue.MarshalMap,
+		unmarshalMap: attributevalue.UnmarshalMap,
 	}, nil
 }
 
@@ -88,7 +114,7 @@ func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, park
 	}
 
 	// Marshal the ticket for DynamoDB
-	item, err := attributevalue.MarshalMap(ticket)
+	item, err := s.marshalMap(ticket)
 	if err != nil {
 		// Log error and return the ticket anyway (best effort)
 		log.Error("Failed to marshal ticket", logger.Field{Key: "error", Value: err.Error()})
@@ -96,7 +122,7 @@ func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, park
 	}
 
 	// Store the ticket in DynamoDB
-	_, err = s.client.PutItem(s.ctx, &dynamodb.PutItemInput{
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	})
@@ -121,7 +147,7 @@ func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*mo
 	}
 
 	// Get the item from DynamoDB
-	result, err := s.client.GetItem(s.ctx, &dynamodb.GetItemInput{
+	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
@@ -138,7 +164,7 @@ func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*mo
 
 	// Unmarshal the item into a ticket
 	ticket := &model.ParkingTicket{}
-	if err := attributevalue.UnmarshalMap(result.Item, ticket); err != nil {
+	if err := s.unmarshalMap(result.Item, ticket); err != nil {
 		log.Error("Failed to unmarshal ticket", logger.Field{Key: "error", Value: err.Error()})
 		return nil, false
 	}
@@ -161,7 +187,7 @@ func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 	}
 
 	// Delete the item from DynamoDB
-	_, err := s.client.DeleteItem(s.ctx, &dynamodb.DeleteItemInput{
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
@@ -176,18 +202,37 @@ func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 // CalculateCharge calculates parking fee
 func (s *ParkingLotService) CalculateCharge(entryTime time.Time) (int, float32) {
 	duration := time.Since(entryTime)
-	minutes := int(duration.Minutes())
+	totalMinutes := duration.Minutes() // Get duration as float64 for precision
 
-	// Calculate charge ($0.10 per minute with a minimum of $5)
-	charge := float32(max(5.0, float64(minutes)*0.10))
-
-	return minutes, charge
-}
-
-// max returns the larger of x or y
-func max(x, y float64) float64 {
-	if x > y {
-		return x
+	// Threshold for zero charge: 1 microsecond in minutes.
+	// (1 microsecond = 1e-6 seconds). (1e-6 seconds) / 60 seconds/minute.
+	const zeroChargeThresholdMinutes = (1.0e-6) / 60.0
+	if totalMinutes < zeroChargeThresholdMinutes {
+		return 0, 0.0
 	}
-	return y
+
+	// Epsilon to handle floating point inaccuracies at 15-minute boundaries.
+	// If entryTime was exactly 15 mins ago, time.Since(entryTime) might yield 15.000...01 minutes.
+	// Subtracting this epsilon helps ensure it's treated as 15 minutes (1st increment)
+	// and not pushed into the 2nd increment.
+	// 1 millisecond = 0.001 seconds. (0.001 seconds) / 60 seconds/minute.
+	const boundaryEpsilonMinutes = 0.001 / 60.0
+
+	adjustedMinutes := totalMinutes - boundaryEpsilonMinutes
+	// Ensure adjustedMinutes doesn't become negative if totalMinutes is very small but above zeroChargeThreshold.
+	if adjustedMinutes < 0 {
+		adjustedMinutes = 0
+	}
+
+	numberOf15MinIncrements := math.Ceil(adjustedMinutes / 15.0)
+
+	// If totalMinutes was positive (>= zeroChargeThresholdMinutes) but numberOf15MinIncrements became 0
+	// (due to adjustedMinutes becoming <= 0), it should still count as 1 increment.
+	// This handles cases where zeroChargeThresholdMinutes < totalMinutes <= boundaryEpsilonMinutes.
+	if numberOf15MinIncrements == 0 && totalMinutes >= zeroChargeThresholdMinutes {
+		numberOf15MinIncrements = 1
+	}
+
+	charge := float32(numberOf15MinIncrements * 2.5)
+	return int(math.Round(totalMinutes)), charge
 }

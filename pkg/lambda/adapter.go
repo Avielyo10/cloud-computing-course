@@ -104,6 +104,12 @@ func NewAPIAdapter() *APIAdapter {
 	}
 }
 
+// Router returns the Gin engine router for the adapter.
+// This is useful for testing or running the server locally.
+func (a *APIAdapter) Router() *gin.Engine {
+	return a.router
+}
+
 // ProxyWithContext handles Lambda requests
 func (a *APIAdapter) ProxyWithContext(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	// Extract or generate a request ID
@@ -134,6 +140,12 @@ func (a *APIAdapter) ProxyWithContext(ctx context.Context, req events.APIGateway
 	if err != nil {
 		reqLog.Error("Lambda request error", logger.Field{Key: "error", Value: err.Error()})
 	}
+
+	// Ensure the request ID is included in the response
+	if response.Headers == nil {
+		response.Headers = make(map[string]string)
+	}
+	response.Headers["X-Request-Id"] = requestID
 
 	return response, err
 }

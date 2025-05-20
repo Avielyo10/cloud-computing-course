@@ -16,7 +16,19 @@ build: generate fmt
 	rm -f bootstrap
 	@echo "Lambda handler built."
 
+test:
+	@echo "Running tests..."
+	go test -v ./...
+	@echo "Tests completed."
+
+coverage:
+	@echo "Running tests with coverage..."
+	go test -v -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated in coverage.html"
+
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -f cmd/lambda/*.zip
+	rm -f coverage.out coverage.html
 	@echo "Cleaned."

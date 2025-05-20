@@ -92,7 +92,7 @@ func main() {
 
 		// API Gateway setup
 		api, err := apigateway.NewRestApi(ctx, "parkingApi", &apigateway.RestApiArgs{
-			Name: pulumi.String("Parking Lot API"),
+			Name:        pulumi.String("Parking Lot API"),
 			Description: pulumi.String("API for parking lot management system"),
 		})
 		if err != nil {
