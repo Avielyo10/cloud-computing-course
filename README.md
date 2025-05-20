@@ -1,6 +1,71 @@
 # Parking Lot Management System
 
-This project is a cloud-based parking lot management system built with Go and AWS serverless technologies. The system provides API endpoints for managing vehicle entry and exit from parking lots, with automatic ticket generation and fee calculation based on parking duration.
+This project is a c## Project Structure
+
+```shell
+├── cmd/lambda        # Lambda handler entry point
+├── deployment        # Pulumi deployment code
+├── internal
+│   ├── handler       # API request handlers
+│   ├── model         # Data models
+│   └── service       # Business logic services
+├── pkg
+│   └── lambda        # Lambda adapter
+├── server
+│   └── api           # Generated API code
+└── spec              # API specifications
+```
+
+## Testing
+
+The project includes a comprehensive test suite with unit tests and integration tests.
+
+### Running Tests
+
+To run unit tests:
+
+```bash
+# Run all unit tests
+make test
+
+# Run tests with coverage report
+make coverage
+```
+
+For manual test running:
+
+```bash
+# Run all unit tests
+go test -v ./...
+
+# Run specific package tests
+go test -v ./internal/service
+
+# Run with coverage
+go test -v -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+### Integration Tests
+
+Integration tests require AWS credentials or DynamoDB Local:
+
+```bash
+# Run with integration tests (requires AWS credentials)
+./scripts/run_tests.sh --integration
+```
+
+Set the following environment variables for integration tests:
+
+- `AWS_PROFILE`: Your AWS profile with DynamoDB permissions
+- `TABLE_NAME`: Name of a DynamoDB table to use for testing
+- `INTEGRATION_TEST=true`: Enables integration test mode
+
+### Continuous Integration
+
+GitHub Actions workflows are included to run tests on every push and pull request.
+
+## Getting Startedg lot management system built with Go and AWS serverless technologies. The system provides API endpoints for managing vehicle entry and exit from parking lots, with automatic ticket generation and fee calculation based on parking duration.
 
 ## Architecture
 
@@ -65,6 +130,55 @@ POST /exit?ticketId={ticketID}
 │   └── api           # Generated API code
 └── spec              # API specifications
 ```
+
+## Testing
+
+The project includes a comprehensive test suite with unit tests and integration tests.
+
+### Running Tests
+
+To run unit tests:
+
+```bash
+# Run all unit tests
+make test
+
+# Run tests with coverage report
+make coverage
+```
+
+For manual test running:
+
+```bash
+# Run all unit tests
+go test -v ./...
+
+# Run specific package tests
+go test -v ./internal/service
+
+# Run with coverage
+go test -v -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
+### Integration Tests
+
+Integration tests require AWS credentials or DynamoDB Local:
+
+```bash
+# Run with integration tests (requires AWS credentials)
+./scripts/run_tests.sh --integration
+```
+
+Set the following environment variables for integration tests:
+
+- `AWS_PROFILE`: Your AWS profile with DynamoDB permissions
+- `TABLE_NAME`: Name of a DynamoDB table to use for testing
+- `INTEGRATION_TEST=true`: Enables integration test mode
+
+### Continuous Integration
+
+GitHub Actions workflows are included to run tests on every push and pull request.
 
 ## Getting Started
 

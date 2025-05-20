@@ -34,10 +34,21 @@ type ParkingLotServicer interface {
 
 // ParkingLotService handles parking lot operations with DynamoDB storage
 type ParkingLotService struct {
-	ctx       context.Context
-	client    *dynamodb.Client
-	tableName string
-	log       logger.Logger
+	ctx          context.Context
+	client       DynamoDBClient
+	tableName    string
+	log          logger.Logger
+	marshalMap   func(interface{}) (map[string]types.AttributeValue, error)
+	unmarshalMap func(map[string]types.AttributeValue, interface{}) error
+}
+
+// DynamoDBClient defines the interface for DynamoDB operations
+// This makes it easier to mock for testing
+type DynamoDBClient interface {
+	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+	// Add other DynamoDB methods as needed
 }
 
 // NewParkingLotService creates a new service instance with DynamoDB
@@ -61,10 +72,12 @@ func NewParkingLotService(ctx context.Context) (*ParkingLotService, error) {
 	client := dynamodb.NewFromConfig(cfg)
 
 	return &ParkingLotService{
-		ctx:       ctx,
-		client:    client,
-		tableName: tableName,
-		log:       log,
+		ctx:          ctx,
+		client:       client,
+		tableName:    tableName,
+		log:          log,
+		marshalMap:   attributevalue.MarshalMap,
+		unmarshalMap: attributevalue.UnmarshalMap,
 	}, nil
 }
 
@@ -88,7 +101,7 @@ func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, park
 	}
 
 	// Marshal the ticket for DynamoDB
-	item, err := attributevalue.MarshalMap(ticket)
+	item, err := s.marshalMap(ticket)
 	if err != nil {
 		// Log error and return the ticket anyway (best effort)
 		log.Error("Failed to marshal ticket", logger.Field{Key: "error", Value: err.Error()})
@@ -96,7 +109,7 @@ func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, park
 	}
 
 	// Store the ticket in DynamoDB
-	_, err = s.client.PutItem(s.ctx, &dynamodb.PutItemInput{
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{ // Changed s.ctx to ctx
 		TableName: aws.String(s.tableName),
 		Item:      item,
 	})
@@ -121,7 +134,7 @@ func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*mo
 	}
 
 	// Get the item from DynamoDB
-	result, err := s.client.GetItem(s.ctx, &dynamodb.GetItemInput{
+	result, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{ // Changed s.ctx to ctx
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})
@@ -138,7 +151,7 @@ func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*mo
 
 	// Unmarshal the item into a ticket
 	ticket := &model.ParkingTicket{}
-	if err := attributevalue.UnmarshalMap(result.Item, ticket); err != nil {
+	if err := s.unmarshalMap(result.Item, ticket); err != nil {
 		log.Error("Failed to unmarshal ticket", logger.Field{Key: "error", Value: err.Error()})
 		return nil, false
 	}
@@ -161,7 +174,7 @@ func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 	}
 
 	// Delete the item from DynamoDB
-	_, err := s.client.DeleteItem(s.ctx, &dynamodb.DeleteItemInput{
+	_, err := s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{ // Changed s.ctx to ctx
 		TableName: aws.String(s.tableName),
 		Key:       key,
 	})

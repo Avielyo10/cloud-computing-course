@@ -135,6 +135,12 @@ func (a *APIAdapter) ProxyWithContext(ctx context.Context, req events.APIGateway
 		reqLog.Error("Lambda request error", logger.Field{Key: "error", Value: err.Error()})
 	}
 
+	// Ensure the request ID is included in the response
+	if response.Headers == nil {
+		response.Headers = make(map[string]string)
+	}
+	response.Headers["X-Request-Id"] = requestID
+
 	return response, err
 }
 
