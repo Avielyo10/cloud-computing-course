@@ -69,6 +69,18 @@ func NewParkingLotService(ctx context.Context) (*ParkingLotService, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
+	// If AWS_ENDPOINT_URL is set (for DynamoDB Local), use it and anonymous credentials
+	if endpointURL := os.Getenv("AWS_ENDPOINT_URL"); endpointURL != "" {
+		log.Info("Using DynamoDB Local with endpoint", logger.Field{Key: "endpoint_url", Value: endpointURL})
+		cfg.Region = os.Getenv("AWS_REGION") // Still need region for the SDK
+		cfg.Credentials = aws.AnonymousCredentials{}
+		cfg.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{URL: endpointURL}, nil
+			},
+		)
+	}
+
 	// Create DynamoDB client
 	client := dynamodb.NewFromConfig(cfg)
 
@@ -224,6 +236,3 @@ func (s *ParkingLotService) CalculateCharge(entryTime time.Time) (int, float32) 
 	charge := float32(numberOf15MinIncrements * 2.5)
 	return int(math.Round(totalMinutes)), charge
 }
-
-// ParkingSpaceManager defines methods for managing parking space availability (placeholder)
-// ...existing code...

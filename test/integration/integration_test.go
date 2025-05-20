@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	
-	"parking-lot/internal/handler"
 	"parking-lot/internal/service"
 	"parking-lot/pkg/lambda"
 )
@@ -37,12 +36,6 @@ func TestEndToEndFlow(t *testing.T) {
 	parkingService, err := service.NewParkingLotService(ctx)
 	require.NoError(t, err, "Failed to create parking service")
 	
-	// Create the handler
-	parkingHandler := handler.NewParkingHandler(parkingService)
-
-	// Create the Lambda adapter
-	adapter := lambda.NewAdapter(parkingHandler)
-
 	// Test data
 	plate := fmt.Sprintf("TEST-%s", uuid.New().String()[:8])
 	parkingLot := 999
@@ -97,7 +90,7 @@ func TestAPIAdapter(t *testing.T) {
 	}
 	
 	// Create the adapter
-	adapter := lambda.NewAdapter()
+	adapter := lambda.NewAPIAdapter() // Corrected constructor name
 	
 	// Start the server in a goroutine
 	serverReady := make(chan bool)
