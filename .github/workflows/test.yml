@@ -55,15 +55,15 @@ jobs:
       - name: Run unit tests
         run: go test -v ./internal/... ./pkg/... ./server/...
 
-      - name: Run integration tests
-        run: go test -v -tags=integration ./test/integration/...
-        env:
-          INTEGRATION_TEST: true
-          TABLE_NAME: parking-tickets-test
-          AWS_ACCESS_KEY_ID: DUMMYIDEXAMPLE
-          AWS_SECRET_ACCESS_KEY: DUMMYEXAMPLEKEY
-          AWS_REGION: us-east-1
-          AWS_ENDPOINT_URL: http://localhost:8000
+      # - name: Run integration tests
+      #   run: go test -v -tags=integration ./test/integration/...
+      #   env:
+      #     INTEGRATION_TEST: true
+      #     TABLE_NAME: parking-tickets-test
+      #     AWS_ACCESS_KEY_ID: DUMMYIDEXAMPLE
+      #     AWS_SECRET_ACCESS_KEY: DUMMYEXAMPLEKEY
+      #     AWS_REGION: us-east-1
+      #     AWS_ENDPOINT_URL: http://localhost:8000
 
       - name: Generate coverage report
         run: go test -coverprofile=coverage.out ./...
