@@ -265,7 +265,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "14.999 minutes (1st 15-min increment)",
 			duration:        14*time.Minute + 59*time.Second + 999*time.Millisecond,
-			expectedMinutes: 14, // approx
+			expectedMinutes: 14,   // approx
 			expectedCharge:  2.50, // Correct: 1 increment * $2.50
 		},
 		{
@@ -277,7 +277,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "15.001 minutes (2nd 15-min increment)", // Barely into the 2nd increment
 			duration:        15*time.Minute + 1*time.Millisecond,
-			expectedMinutes: 15, // approx
+			expectedMinutes: 15,   // approx
 			expectedCharge:  5.00, // Correct: 2 increments * $2.50
 		},
 		{
@@ -289,7 +289,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "29.999 minutes (2nd 15-min increment)",
 			duration:        29*time.Minute + 59*time.Second + 999*time.Millisecond,
-			expectedMinutes: 29, // approx
+			expectedMinutes: 29,   // approx
 			expectedCharge:  5.00, // Correct: 2 increments * $2.50
 		},
 		{
@@ -301,7 +301,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "30.001 minutes (3rd 15-min increment)",
 			duration:        30*time.Minute + 1*time.Millisecond,
-			expectedMinutes: 30, // approx
+			expectedMinutes: 30,   // approx
 			expectedCharge:  7.50, // Correct: 3 increments * $2.50
 		},
 		{
@@ -313,7 +313,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "59.999 minutes (4th 15-min increment)",
 			duration:        59*time.Minute + 59*time.Second + 999*time.Millisecond,
-			expectedMinutes: 59, // approx
+			expectedMinutes: 59,    // approx
 			expectedCharge:  10.00, // Correct: 4 increments * $2.50
 		},
 		{
@@ -325,7 +325,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "60.001 minutes (5th 15-min increment)",
 			duration:        60*time.Minute + 1*time.Millisecond,
-			expectedMinutes: 60, // approx
+			expectedMinutes: 60,    // approx
 			expectedCharge:  12.50, // Correct: 5 increments * $2.50
 		},
 		{
@@ -337,7 +337,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "119.999 minutes (8th 15-min increment)",
 			duration:        119*time.Minute + 59*time.Second + 999*time.Millisecond,
-			expectedMinutes: 119, // approx
+			expectedMinutes: 119,   // approx
 			expectedCharge:  20.00, // Correct: 8 increments * $2.50
 		},
 		{
@@ -349,7 +349,7 @@ func TestCalculateCharge(t *testing.T) {
 		{
 			name:            "120.001 minutes (9th 15-min increment)",
 			duration:        120*time.Minute + 1*time.Millisecond,
-			expectedMinutes: 120, // approx
+			expectedMinutes: 120,   // approx
 			expectedCharge:  22.50, // Correct: 9 increments * $2.50
 		},
 	}
