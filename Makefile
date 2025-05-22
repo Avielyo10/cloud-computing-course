@@ -22,6 +22,11 @@ test:
 	go test -v ./...
 	@echo "Tests completed."
 
+test-deployment:
+	@echo "Testing deployed infrastructure..."
+	./scripts/test_deployment.sh
+	@echo "Deployment tests completed."
+
 coverage:
 	@echo "Running tests with coverage..."
 	go test -v -coverprofile=coverage.out ./...
