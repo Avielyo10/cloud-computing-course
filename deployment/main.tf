@@ -92,8 +92,10 @@ resource "aws_lambda_function" "entry_handler" {
   function_name = "entryHandler"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "provided.al2"
+  architectures = ["arm64"]
   handler       = "bootstrap"
   filename      = "../cmd/lambda/entry-handler.zip"
+  source_code_hash = filebase64sha256("../cmd/lambda/entry-handler.zip")
 
   environment {
     variables = {
@@ -107,8 +109,10 @@ resource "aws_lambda_function" "exit_handler" {
   function_name = "exitHandler"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "provided.al2"
+  architectures = ["arm64"]
   handler       = "bootstrap"
   filename      = "../cmd/lambda/exit-handler.zip"
+  source_code_hash = filebase64sha256("../cmd/lambda/exit-handler.zip")
 
   environment {
     variables = {
