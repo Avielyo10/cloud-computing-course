@@ -45,3 +45,6 @@ override.tf.json
 crash.log
 crash.*.log
 tfplan
+
+# Cursor files
+.cursor/
