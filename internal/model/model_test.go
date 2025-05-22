@@ -17,12 +17,16 @@ func TestParkingTicketMarshalUnmarshal(t *testing.T) {
 	plate := "ABC-123"
 	parkingLot := 456
 	entryTime := time.Now().UTC().Truncate(time.Millisecond) // Truncate to avoid precision issues
+	status := TicketStatusIn
+	charge := float32(5.0)
 
 	ticket := &ParkingTicket{
 		TicketID:   ticketID,
 		Plate:      plate,
 		ParkingLot: parkingLot,
 		EntryTime:  entryTime,
+		Status:     status,
+		Charge:     charge,
 	}
 
 	// Marshal the ticket to DynamoDB attributes
@@ -37,6 +41,8 @@ func TestParkingTicketMarshalUnmarshal(t *testing.T) {
 	assert.Contains(t, attrs, "plate")
 	assert.Contains(t, attrs, "parkingLot")
 	assert.Contains(t, attrs, "entryTime")
+	assert.Contains(t, attrs, "status")
+	assert.Contains(t, attrs, "charge")
 
 	// Unmarshal back to a ticket
 	unmarshaled := &ParkingTicket{}
@@ -48,4 +54,6 @@ func TestParkingTicketMarshalUnmarshal(t *testing.T) {
 	assert.Equal(t, plate, unmarshaled.Plate)
 	assert.Equal(t, parkingLot, unmarshaled.ParkingLot)
 	assert.Equal(t, entryTime, unmarshaled.EntryTime)
+	assert.Equal(t, status, unmarshaled.Status)
+	assert.Equal(t, charge, unmarshaled.Charge)
 }
