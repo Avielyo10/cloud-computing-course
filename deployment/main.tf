@@ -38,6 +38,16 @@ resource "aws_dynamodb_table" "parking_tickets" {
     type = "S"
   }
   
+  attribute {
+    name = "status"
+    type = "S"
+  }
+
+  attribute {
+    name = "charge"
+    type = "N"
+  }
+  
   # Global Secondary Index for plate lookups
   global_secondary_index {
     name               = "PlateIndex"
@@ -56,6 +66,14 @@ resource "aws_dynamodb_table" "parking_tickets" {
   global_secondary_index {
     name               = "EntryTimeIndex"
     hash_key           = "entryTime"
+    projection_type    = "ALL"
+  }
+  
+  # Global Secondary Index for status lookups
+  global_secondary_index {
+    name               = "StatusIndex"
+    hash_key           = "status"
+    range_key          = "charge"
     projection_type    = "ALL"
   }
 }
