@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/apigateway"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/dynamodb"
 	"github.com/pulumi/pulumi-aws/sdk/v6/go/aws/iam"
@@ -11,6 +10,9 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
+		// Set the AWS region explicitly
+		awsRegion := pulumi.String("il-central-1")
+		
 		// DynamoDB table definition matching Go data model
 		table, err := dynamodb.NewTable(ctx, "parkingTickets", &dynamodb.TableArgs{
 			Attributes: dynamodb.TableAttributeArray{
@@ -216,8 +218,7 @@ func main() {
 			return err
 		}
 		// Export the API endpoint URL
-		region := aws.Provider{}.Region
-		ctx.Export("apiUrl", pulumi.Sprintf("https://%s.execute-api.%s.amazonaws.com/prod", api.ID(), region))
+		ctx.Export("apiUrl", pulumi.Sprintf("https://%s.execute-api.%s.amazonaws.com/prod", api.ID(), awsRegion))
 		ctx.Export("apiEndpoint", api.ExecutionArn)
 		ctx.Export("entryLambdaName", entryLambda.Name)
 		ctx.Export("exitLambdaName", exitLambda.Name)

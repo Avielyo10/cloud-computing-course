@@ -1,0 +1,3 @@
+name: parking-lot
+runtime: go
+description: A Pulumi project for parking lot management system on AWS 
