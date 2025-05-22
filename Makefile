@@ -32,3 +32,15 @@ clean:
 	rm -f cmd/lambda/*.zip
 	rm -f coverage.out coverage.html
 	@echo "Cleaned."
+
+deploy: clean test build
+	@if [ -z "$$AWS_ACCESS_KEY_ID" ] || [ -z "$$AWS_SECRET_ACCESS_KEY" ] || [ -z "$$AWS_REGION" ]; then \
+		echo "Error: AWS credentials not set. Please set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and AWS_REGION environment variables."; \
+		exit 1; \
+	fi
+	@echo "Deploying infrastructure using Terraform..."
+	cd deployment && \
+	terraform init && \
+	terraform plan -out=tfplan && \
+	TF_LOG=DEBUG terraform apply -auto-approve tfplan
+	@echo "Deployment completed."
