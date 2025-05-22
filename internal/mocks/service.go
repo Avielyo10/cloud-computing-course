@@ -41,3 +41,9 @@ func (m *ParkingService) CalculateCharge(entryTime time.Time) (int, float32) {
 	args := m.Called(entryTime)
 	return args.Int(0), args.Get(1).(float32)
 }
+
+// UpdateTicket mocks the ticket update
+func (m *ParkingService) UpdateTicket(ctx context.Context, ticket *model.ParkingTicket) error {
+	args := m.Called(ctx, ticket)
+	return args.Error(0)
+}

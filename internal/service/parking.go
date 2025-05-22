@@ -26,6 +26,9 @@ type ParkingLotServicer interface {
 	// GetTicket retrieves a ticket by ID
 	GetTicket(ctx context.Context, ticketID string) (*model.ParkingTicket, bool)
 
+	// UpdateTicket updates an existing parking ticket
+	UpdateTicket(ctx context.Context, ticket *model.ParkingTicket) error
+
 	// RemoveTicket removes a ticket from storage
 	RemoveTicket(ctx context.Context, ticketID string)
 
@@ -111,6 +114,8 @@ func (s *ParkingLotService) CreateTicket(ctx context.Context, plate string, park
 		Plate:      plate,
 		ParkingLot: parkingLot,
 		EntryTime:  time.Now(),
+		Status:     model.TicketStatusIn,
+		Charge:     0.0,
 	}
 
 	// Marshal the ticket for DynamoDB
@@ -235,4 +240,36 @@ func (s *ParkingLotService) CalculateCharge(entryTime time.Time) (int, float32) 
 
 	charge := float32(numberOf15MinIncrements * 2.5)
 	return int(math.Round(totalMinutes)), charge
+}
+
+// UpdateTicket updates an existing parking ticket in DynamoDB
+func (s *ParkingLotService) UpdateTicket(ctx context.Context, ticket *model.ParkingTicket) error {
+	log := s.log.WithContext(ctx).WithFields(
+		logger.Field{Key: "ticket_id", Value: ticket.TicketID},
+		logger.Field{Key: "plate", Value: ticket.Plate},
+		logger.Field{Key: "parking_lot", Value: ticket.ParkingLot},
+		logger.Field{Key: "status", Value: string(ticket.Status)},
+		logger.Field{Key: "charge", Value: ticket.Charge},
+	)
+	log.Info("Updating parking ticket")
+
+	// Marshal the ticket for DynamoDB
+	item, err := s.marshalMap(ticket)
+	if err != nil {
+		log.Error("Failed to marshal ticket for update", logger.Field{Key: "error", Value: err.Error()})
+		return fmt.Errorf("failed to marshal ticket for update: %w", err)
+	}
+
+	// Update the ticket in DynamoDB
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(s.tableName),
+		Item:      item, // PutItem will overwrite the existing item with the same key
+	})
+	if err != nil {
+		log.Error("Failed to update ticket in DynamoDB", logger.Field{Key: "error", Value: err.Error()})
+		return fmt.Errorf("failed to update ticket in DynamoDB: %w", err)
+	}
+
+	log.Info("Successfully updated ticket in DynamoDB")
+	return nil
 }

@@ -46,6 +46,8 @@ func TestCreateTicket(t *testing.T) {
 	assert.Equal(t, plate, ticket.Plate)
 	assert.Equal(t, parkingLot, ticket.ParkingLot)
 	assert.WithinDuration(t, time.Now(), ticket.EntryTime, 2*time.Second)
+	assert.Equal(t, model.TicketStatusIn, ticket.Status)
+	assert.Equal(t, float32(0.0), ticket.Charge)
 
 	service.client.(*mocks.DynamoDBClient).AssertExpectations(t)
 }
@@ -235,6 +237,89 @@ func TestRemoveTicket_DeleteItemError(t *testing.T) {
 	service.RemoveTicket(ctx, "id")
 }
 
+// TestUpdateTicket tests updating a ticket
+func TestUpdateTicket(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockClient := new(mocks.DynamoDBClient)
+	service := &ParkingLotService{
+		ctx:          ctx,
+		client:       mockClient,
+		tableName:    "testTable",
+		log:          logger.NewLogger(),
+		marshalMap:   attributevalue.MarshalMap,
+		unmarshalMap: attributevalue.UnmarshalMap,
+	}
+
+	// Test data
+	testTicket := &model.ParkingTicket{
+		TicketID:   uuid.New().String(),
+		Plate:      "UPD-001",
+		ParkingLot: 789,
+		EntryTime:  time.Now().Add(-60 * time.Minute),
+		Status:     model.TicketStatusOut,
+		Charge:     10.0,
+	}
+
+	// Mock the DynamoDB PutItem response for update
+	mockClient.On("PutItem", ctx, mock.AnythingOfType("*dynamodb.PutItemInput"), mock.Anything).Return(&dynamodb.PutItemOutput{}, nil).Once()
+
+	// Call the function
+	err := service.UpdateTicket(ctx, testTicket)
+
+	// Assertions
+	assert.NoError(t, err)
+
+	// Verify that PutItem was called
+	mockClient.AssertCalled(t, "PutItem", ctx, mock.AnythingOfType("*dynamodb.PutItemInput"), mock.Anything)
+}
+
+// TestUpdateTicket_MarshalError tests error handling in UpdateTicket when marshalling
+func TestUpdateTicket_MarshalError(t *testing.T) {
+	ctx := context.Background()
+	mockClient := new(mocks.DynamoDBClient) // No need to set expectations if marshal fails before client call
+	service := &ParkingLotService{
+		ctx:       ctx,
+		client:    mockClient,
+		tableName: "testTable",
+		log:       logger.NewLogger(),
+		marshalMap: func(in interface{}) (map[string]types.AttributeValue, error) {
+			return nil, fmt.Errorf("marshal error")
+		},
+		unmarshalMap: attributevalue.UnmarshalMap,
+	}
+
+	testTicket := &model.ParkingTicket{TicketID: "test-id"} // Minimal ticket for the test
+	err := service.UpdateTicket(ctx, testTicket)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "marshal error")
+}
+
+// TestUpdateTicket_PutItemError tests error handling in UpdateTicket when PutItem fails
+func TestUpdateTicket_PutItemError(t *testing.T) {
+	ctx := context.Background()
+	mockClient := new(mocks.DynamoDBClient)
+	service := &ParkingLotService{
+		ctx:          ctx,
+		client:       mockClient,
+		tableName:    "testTable",
+		log:          logger.NewLogger(),
+		marshalMap:   attributevalue.MarshalMap,
+		unmarshalMap: attributevalue.UnmarshalMap,
+	}
+
+	testTicket := &model.ParkingTicket{TicketID: "test-id"} // Minimal ticket for the test
+
+	mockClient.On("PutItem", ctx, mock.AnythingOfType("*dynamodb.PutItemInput"), mock.Anything).Return(nil, fmt.Errorf("put error")).Once()
+
+	err := service.UpdateTicket(ctx, testTicket)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "put error")
+	mockClient.AssertCalled(t, "PutItem", ctx, mock.AnythingOfType("*dynamodb.PutItemInput"), mock.Anything)
+}
+
 // TestCalculateCharge tests the charge calculation logic
 func TestCalculateCharge(t *testing.T) {
 	// Setup
@@ -363,7 +448,7 @@ func TestCalculateCharge(t *testing.T) {
 
 			// Allow for a small discrepancy in minutes due to test execution time.
 			// The actual minutes calculated by time.Since(entryTime) might be slightly
-			// greater than tc.expectedMinutes if the test takes a moment to run.
+			// greater than tc.expectedMinutes.
 			// We check if 'minutes' is very close to 'tc.expectedMinutes'.
 			// A common way is to check if it's within a small delta, e.g., expectedMinutes or expectedMinutes + 1.
 			// For durations like 0, it should be 0 or 1.
