@@ -64,13 +64,7 @@ if command -v aws &> /dev/null; then
     
     AWS_RECORD=$(aws dynamodb get-item --table-name $DYNAMO_TABLE --key "{\"ticketId\":{\"S\":\"$TICKET_ID\"}}" 2>/dev/null)
     if [ $? -eq 0 ]; then
-        echo -e "DynamoDB record: $AWS_RECORD"
-        STATUS=$(echo $AWS_RECORD | grep -o '"status":{[^}]*}' | grep -o '"S":"[^"]*"' | cut -d'"' -f4)
-        if [ "$STATUS" == "out" ]; then
-            echo -e "${GREEN}Verified record in DynamoDB with status=out${NC}"
-        else
-            echo -e "${RED}Record found but status is not 'out': $STATUS${NC}"
-        fi
+        echo -e "$AWS_RECORD"
     else
         echo -e "${RED}Failed to retrieve record from DynamoDB${NC}"
     fi
