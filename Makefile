@@ -10,6 +10,7 @@ fmt:
 build: generate fmt
 	@echo "Building Lambda handler..."
 	cd cmd/lambda && \
+	rm -f bootstrap entry-handler.zip exit-handler.zip && \
 	GOOS=linux GOARCH=arm64 go build -o bootstrap main.go && \
 	zip entry-handler.zip bootstrap && \
 	zip exit-handler.zip bootstrap && \
