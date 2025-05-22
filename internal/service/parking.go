@@ -143,7 +143,7 @@ func (s *ParkingLotService) GetTicket(ctx context.Context, ticketID string) (*mo
 
 	// Create the key for DynamoDB query
 	key := map[string]types.AttributeValue{
-		"TicketID": &types.AttributeValueMemberS{Value: ticketID},
+		"ticketId": &types.AttributeValueMemberS{Value: ticketID},
 	}
 
 	// Get the item from DynamoDB
@@ -183,7 +183,7 @@ func (s *ParkingLotService) RemoveTicket(ctx context.Context, ticketID string) {
 
 	// Create the key for DynamoDB deletion
 	key := map[string]types.AttributeValue{
-		"TicketID": &types.AttributeValueMemberS{Value: ticketID},
+		"ticketId": &types.AttributeValueMemberS{Value: ticketID},
 	}
 
 	// Delete the item from DynamoDB
