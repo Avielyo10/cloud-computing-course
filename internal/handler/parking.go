@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"parking-lot/internal/logger"
+	"parking-lot/internal/model"
 	"parking-lot/internal/service"
 	"parking-lot/server/api"
 )
@@ -75,6 +76,21 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 		logger.Field{Key: "charge", Value: charge},
 	)
 
+	// Update ticket status and charge
+	ticket.Status = model.TicketStatusOut // Assuming model.TicketStatusOut is defined
+	ticket.Charge = charge
+
+	// Update the ticket in storage
+	if err := h.service.UpdateTicket(ctx, ticket); err != nil {
+		errorMsg := "Failed to update ticket"
+		response := api.ErrorResponse{
+			Message: errorMsg,
+		}
+		log.Error("Failed to update ticket", logger.Field{Key: "error", Value: err.Error()})
+		c.JSON(http.StatusInternalServerError, response)
+		return
+	}
+
 	// Create response
 	response := api.ExitResponse{
 		Plate:                 ticket.Plate,
@@ -82,9 +98,6 @@ func (h *ParkingHandler) PostExit(c *gin.Context, params api.PostExitParams) {
 		ParkedDurationMinutes: minutes,
 		Charge:                charge,
 	}
-
-	// Remove the ticket from storage
-	h.service.RemoveTicket(ctx, params.TicketId.String())
 
 	log.Info("Vehicle exit processed successfully")
 	c.JSON(http.StatusOK, response)
