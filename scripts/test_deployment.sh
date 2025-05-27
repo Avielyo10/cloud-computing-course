@@ -3,7 +3,7 @@
 set -e
 
 # API details from Terraform deployment
-API_URL="hgx6ecww6d.execute-api.il-central-1.amazonaws.com/prod"
+API_URL="1zes1gobgf.execute-api.il-central-1.amazonaws.com/prod"
 DYNAMO_TABLE="parkingTickets"
 
 # Colors for output
@@ -57,7 +57,7 @@ else
     exit 1
 fi
 
-# Optional: Use AWS CLI to verify the ticket is in DynamoDB with status = out
+# Use AWS CLI to verify the ticket is in DynamoDB with status = out
 if command -v aws &> /dev/null; then
     echo -e "\n${BLUE}Verifying DynamoDB record...${NC}"
     echo -e "aws dynamodb get-item --table-name $DYNAMO_TABLE --key '{\"ticketId\":{\"S\":\"$TICKET_ID\"}}'"
@@ -71,3 +71,8 @@ if command -v aws &> /dev/null; then
 fi
 
 echo -e "\n${GREEN}Deployment testing completed successfully!${NC}" 
+
+# Check for exit a plate that is not in the system
+echo -e "\n${BLUE}Checking for exit a plate that is not in the system...${NC}"
+EXIT_RESPONSE=$(curl -s -X POST "https://$API_URL/exit?ticketId=NONEXISTENT")
+echo "Response: $EXIT_RESPONSE"
