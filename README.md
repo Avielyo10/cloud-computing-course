@@ -38,19 +38,7 @@ The system is built with a serverless architecture using:
 
 ### System Components
 
-```
-┌─────────────┐     ┌─────────────────┐
-│             │     │ AWS Lambda      │
-│             │─────▶ (Entry Handler) │
-│             │     └─────────────────┘
-│ API Gateway │            │            ┌───────────────┐
-│             │            └────────────▶               │
-│             │                         │    DynamoDB   │
-│             │     ┌─────────────────┐ │               │
-│             │─────▶ AWS Lambda      │ │               │
-└─────────────┘     │ (Exit Handler)  │─▶               │
-                    └─────────────────┘ └───────────────┘
-```
+![Architecture](./docs/architecture.png)
 
 ## Features
 
